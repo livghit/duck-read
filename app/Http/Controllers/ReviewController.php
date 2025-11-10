@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreReviewRequest;
 use App\Http\Requests\UpdateReviewRequest;
+use App\Models\Book;
 use App\Models\Review;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -13,16 +15,30 @@ class ReviewController extends Controller
 {
     public function index(): Response
     {
-        $reviews = auth()->user()->reviews()->with('book')->latest()->get();
+        $reviews = auth()->user()->reviews()
+            ->with(['book', 'user:id,name'])
+            ->latest()
+            ->get();
 
         return Inertia::render('reviews/index', [
             'reviews' => $reviews,
+            'currentUserId' => auth()->id(),
         ]);
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
-        return Inertia::render('reviews/form');
+        $books = Book::query()
+            ->latest()
+            ->limit(20)
+            ->get(['id', 'title', 'author', 'cover_url']);
+
+        $selectedBookId = $request->integer('book_id') ?: null;
+
+        return Inertia::render('reviews/form', [
+            'books' => $books,
+            'selectedBookId' => $selectedBookId,
+        ]);
     }
 
     public function store(StoreReviewRequest $request): RedirectResponse
@@ -40,6 +56,9 @@ class ReviewController extends Controller
         }
 
         auth()->user()->reviews()->create($validated);
+
+        // Remove any to-review list entries for this book/user now that it's reviewed
+        auth()->user()->toReviewLists()->where('book_id', $validated['book_id'])->delete();
 
         return redirect()->route('reviews.index');
     }

@@ -13,7 +13,16 @@ class ToReviewListController extends Controller
 {
     public function index(): Response
     {
-        $items = auth()->user()->toReviewLists()->with('book')->pending()->get();
+        $items = auth()->user()->toReviewLists()
+            ->whereNotExists(function ($q) {
+                $q->selectRaw(1)
+                    ->from('reviews')
+                    ->whereColumn('reviews.book_id', 'to_review_lists.book_id')
+                    ->where('reviews.user_id', auth()->id());
+            })
+            ->with('book')
+            ->pending()
+            ->get();
 
         return Inertia::render('to-review-lists/index', [
             'items' => $items,
