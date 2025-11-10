@@ -1,8 +1,7 @@
 import { EmptyState } from '@/components/EmptyState';
-import MarkdownRenderer from '@/components/MarkdownRenderer';
+import MarkdownEditor from '@/components/MarkdownEditor';
 import StarRating from '@/components/StarRating';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import {
     Select,
     SelectContent,
@@ -10,7 +9,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Form, Head, router } from '@inertiajs/react';
@@ -43,7 +41,7 @@ export default function ReviewForm({
     books = [],
     selectedBookId = null,
 }: ReviewFormProps) {
-    const [preview, setPreview] = React.useState(false);
+    // Removed local preview toggle (handled inside MarkdownEditor)
     const [rating, setRating] = React.useState(review?.rating ?? 0);
     const [content, setContent] = React.useState(review?.content ?? '');
     const [bookId, setBookId] = React.useState<string | number | undefined>(
@@ -264,51 +262,17 @@ export default function ReviewForm({
                                     >
                                         Your Review
                                     </label>
-                                    <button
-                                        type="button"
-                                        onClick={() => setPreview(!preview)}
-                                        className="text-xs font-medium text-primary hover:underline"
-                                    >
-                                        {preview ? 'Edit' : 'Preview'}
-                                    </button>
                                 </div>
 
-                                {preview ? (
-                                    <Card>
-                                        <CardContent className="pt-6">
-                                            {content ? (
-                                                <MarkdownRenderer
-                                                    content={content}
-                                                />
-                                            ) : (
-                                                <p className="text-sm text-muted-foreground italic">
-                                                    Your review preview will
-                                                    appear here...
-                                                </p>
-                                            )}
-                                        </CardContent>
-                                    </Card>
-                                ) : (
-                                    <Textarea
-                                        id="content"
-                                        name="content"
-                                        value={content}
-                                        onChange={(e) =>
-                                            setContent(e.target.value)
-                                        }
-                                        placeholder="Share your thoughts about this book... Supports markdown formatting."
-                                        className="min-h-[300px] font-mono text-sm"
-                                    />
-                                )}
-                                {errors.content && (
-                                    <p className="text-sm text-destructive">
-                                        {errors.content}
-                                    </p>
-                                )}
-                                <p className="text-xs text-muted-foreground">
-                                    Supports markdown: **bold**, *italic*,
-                                    `code`, links, etc.
-                                </p>
+                                <MarkdownEditor
+                                    id="content"
+                                    name="content"
+                                    value={content}
+                                    onChange={setContent}
+                                    placeholder="Share your thoughts about this book... Supports markdown formatting."
+                                    error={errors.content}
+                                    minLength={10}
+                                />
                             </div>
 
                             {/* Hidden book_id field when editing */}
@@ -327,7 +291,8 @@ export default function ReviewForm({
                                     disabled={
                                         processing ||
                                         rating === 0 ||
-                                        (!isEdit && !bookId)
+                                        (!isEdit && !bookId) ||
+                                        content.trim().length < 10
                                     }
                                 >
                                     {processing
