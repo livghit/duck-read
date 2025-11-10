@@ -117,7 +117,13 @@ describe('ReviewController', function () {
 
             $response = $this->actingAs($user)->get(route('reviews.show', $review));
 
-            $response->assertSuccessful();
+            $response->assertOk()
+                ->assertInertia(fn (Assert $page) => $page
+                    ->component('reviews/show')
+                    ->has('review')
+                    ->where('review.id', $review->id)
+                    ->has('review.book')
+                );
         });
 
         it('requires authentication', function () {

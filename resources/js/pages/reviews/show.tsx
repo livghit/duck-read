@@ -49,13 +49,22 @@ export default function ReviewShow({ review }: ReviewShowProps) {
             <div className="flex flex-1 flex-col gap-6 overflow-x-auto rounded-xl p-4">
                 {/* Header */}
                 <div className="space-y-4">
-                    <div>
-                        <h1 className="text-3xl font-bold">
-                            {review.book.title}
-                        </h1>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                            by {review.book.author}
-                        </p>
+                    <div className="flex gap-6">
+                        {review.book.cover_url && (
+                            <img
+                                src={review.book.cover_url}
+                                alt={review.book.title}
+                                className="h-40 w-28 shrink-0 rounded object-cover shadow"
+                            />
+                        )}
+                        <div>
+                            <h1 className="text-3xl font-bold">
+                                {review.book.title}
+                            </h1>
+                            <p className="mt-2 text-sm text-muted-foreground">
+                                by {review.book.author}
+                            </p>
+                        </div>
                     </div>
 
                     {/* Rating */}

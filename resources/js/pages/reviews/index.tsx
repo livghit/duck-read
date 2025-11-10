@@ -118,7 +118,14 @@ export default function ReviewsIndex({
                                                         />
                                                     )}
                                                     <div className="space-y-1">
-                                                        <div className="leading-tight font-medium">
+                                                        <div
+                                                            className="cursor-pointer leading-tight font-medium hover:underline"
+                                                            onClick={() =>
+                                                                router.visit(
+                                                                    `/reviews/${review.id}`,
+                                                                )
+                                                            }
+                                                        >
                                                             {review.book?.title}
                                                         </div>
                                                         <div className="text-xs text-muted-foreground">
