@@ -1,0 +1,13 @@
+{
+    "agents": [
+        "opencode"
+    ],
+    "editors": [
+        "opencode",
+        "phpstorm"
+    ],
+    "guidelines": [
+        "laravel/fortify"
+    ],
+    "herd_mcp": true
+}
