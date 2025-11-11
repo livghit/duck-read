@@ -87,7 +87,12 @@ export default function BooksSearch({
             );
 
             if (!response.ok) {
-                throw new Error('Search failed');
+                console.error(
+                    `Search API failed with status ${response.status}: ${response.statusText}`,
+                );
+                const text = await response.text();
+                console.error('Response body:', text);
+                throw new Error(`Search failed with status ${response.status}`);
             }
 
             const data: SearchApiResponse = await response.json();
