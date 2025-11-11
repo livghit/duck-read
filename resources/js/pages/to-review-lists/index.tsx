@@ -16,11 +16,22 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Textarea } from '@/components/ui/textarea';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { Trash2 } from 'lucide-react';
+import { MoreHorizontal, Trash2 } from 'lucide-react';
 
 interface Book {
     id: string | number;
@@ -49,10 +60,20 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 import React from 'react';
 export default function ToReviewListIndex({ items }: ToReviewListIndexProps) {
+    const [pendingDeleteId, setPendingDeleteId] = React.useState<
+        string | number | null
+    >(null);
+
     const handleRemove = (itemId: string | number) => {
-        if (confirm('Remove this book from your to-review list?')) {
-            router.delete(destroy.url(Number(itemId)));
-        }
+        setPendingDeleteId(itemId);
+    };
+
+    const confirmRemove = () => {
+        if (pendingDeleteId == null) return;
+        router.delete(destroy.url(Number(pendingDeleteId)), {
+            onSuccess: () => setPendingDeleteId(null),
+            onFinish: () => setPendingDeleteId(null),
+        });
     };
 
     const [openId, setOpenId] = React.useState<string | number | null>(null);
@@ -94,7 +115,7 @@ export default function ToReviewListIndex({ items }: ToReviewListIndexProps) {
             <div className="flex flex-1 flex-col gap-6 overflow-x-auto rounded-xl p-4">
                 <div className="space-y-2">
                     <h1 className="text-3xl font-bold">To-Review List</h1>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-muted-foreground text-sm">
                         {items.length} book{items.length !== 1 ? 's' : ''}{' '}
                         waiting for your review
                     </p>
@@ -118,118 +139,369 @@ export default function ToReviewListIndex({ items }: ToReviewListIndexProps) {
                                     onClick={() => handleViewBook(item.book)}
                                 />
 
-                                {/* Actions Overlay */}
-                                <div className="absolute inset-0 flex items-center justify-center gap-2 rounded-lg bg-black/50 p-2 opacity-0 transition-opacity group-hover:opacity-100">
-                                    <Dialog
-                                        open={openId === item.id}
-                                        onOpenChange={(open) => {
-                                            if (open) {
-                                                setOpenId(item.id);
-                                            } else {
-                                                setOpenId(null);
-                                                resetForm();
-                                            }
-                                        }}
-                                    >
-                                        <DialogTrigger asChild>
-                                            <Button
-                                                size="sm"
-                                                variant="secondary"
-                                                onClick={() =>
-                                                    setOpenId(item.id)
+                                {/* Actions */}
+                                <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-stretch">
+                                    {/* Desktop Hover Bar */}
+                                    <div className="pointer-events-none hidden translate-y-2 gap-2 p-2 opacity-0 transition-all duration-200 group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:translate-y-0 group-hover:opacity-100 motion-reduce:transition-none sm:flex">
+                                        <Dialog
+                                            open={openId === item.id}
+                                            onOpenChange={(open) => {
+                                                if (open) {
+                                                    setOpenId(item.id);
+                                                } else {
+                                                    setOpenId(null);
+                                                    resetForm();
                                                 }
-                                            >
-                                                Review
-                                            </Button>
-                                        </DialogTrigger>
-                                        <DialogContent>
-                                            <DialogHeader>
-                                                <DialogTitle>
-                                                    Quick Review
-                                                </DialogTitle>
-                                                <DialogDescription>
-                                                    {item.book.title} by{' '}
-                                                    {item.book.author}
-                                                </DialogDescription>
-                                            </DialogHeader>
-                                            <div className="space-y-4">
-                                                <div className="space-y-2">
-                                                    <label className="text-sm font-medium">
-                                                        Rating
-                                                    </label>
-                                                    <StarRating
-                                                        rating={rating}
-                                                        onRatingChange={
-                                                            setRating
-                                                        }
-                                                    />
-                                                    <p className="text-xs text-muted-foreground">
-                                                        {rating > 0
-                                                            ? `${rating}/5 stars`
-                                                            : 'Select a rating'}
-                                                    </p>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label
-                                                        htmlFor="content"
-                                                        className="text-sm font-medium"
-                                                    >
-                                                        Review
-                                                    </label>
-                                                    <Textarea
-                                                        id="content"
-                                                        value={content}
-                                                        onChange={(e) =>
-                                                            setContent(
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        placeholder="Share a brief review (min 10 characters)"
-                                                        className="min-h-[140px]"
-                                                    />
-                                                    <p className="text-xs text-muted-foreground">
-                                                        Minimum 10 characters.
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <DialogFooter>
-                                                <DialogClose asChild>
-                                                    <Button
-                                                        variant="outline"
-                                                        type="button"
-                                                    >
-                                                        Cancel
-                                                    </Button>
-                                                </DialogClose>
+                                            }}
+                                        >
+                                            <DialogTrigger asChild>
                                                 <Button
-                                                    type="button"
-                                                    disabled={
-                                                        rating < 1 ||
-                                                        content.trim().length <
-                                                            10
-                                                    }
+                                                    size="sm"
+                                                    variant="secondary"
+                                                    className="pointer-events-auto flex-1"
                                                     onClick={() =>
-                                                        handleMarkReviewed(
-                                                            item.id,
-                                                        )
+                                                        setOpenId(item.id)
                                                     }
                                                 >
-                                                    Publish Review
+                                                    Review
                                                 </Button>
-                                            </DialogFooter>
-                                        </DialogContent>
-                                    </Dialog>
-                                    <Button
-                                        size="sm"
-                                        variant="destructive"
-                                        onClick={() => handleRemove(item.id)}
-                                    >
-                                        <Trash2 className="size-4" />
-                                    </Button>
+                                            </DialogTrigger>
+                                            <DialogContent>
+                                                <DialogHeader>
+                                                    <DialogTitle>
+                                                        Quick Review
+                                                    </DialogTitle>
+                                                    <DialogDescription>
+                                                        {item.book.title} by{' '}
+                                                        {item.book.author}
+                                                    </DialogDescription>
+                                                </DialogHeader>
+                                                <div className="space-y-4">
+                                                    <div className="space-y-2">
+                                                        <label className="text-sm font-medium">
+                                                            Rating
+                                                        </label>
+                                                        <StarRating
+                                                            rating={rating}
+                                                            onRatingChange={
+                                                                setRating
+                                                            }
+                                                        />
+                                                        <p className="text-muted-foreground text-xs">
+                                                            {rating > 0
+                                                                ? `${rating}/5 stars`
+                                                                : 'Select a rating'}
+                                                        </p>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <label
+                                                            htmlFor="content"
+                                                            className="text-sm font-medium"
+                                                        >
+                                                            Review
+                                                        </label>
+                                                        <Textarea
+                                                            id="content"
+                                                            value={content}
+                                                            onChange={(e) =>
+                                                                setContent(
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            placeholder="Share a brief review (min 10 characters)"
+                                                            className="min-h-[140px]"
+                                                        />
+                                                        <p className="text-muted-foreground text-xs">
+                                                            Minimum 10
+                                                            characters.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <DialogFooter>
+                                                    <DialogClose asChild>
+                                                        <Button
+                                                            variant="outline"
+                                                            type="button"
+                                                        >
+                                                            Cancel
+                                                        </Button>
+                                                    </DialogClose>
+                                                    <Button
+                                                        type="button"
+                                                        disabled={
+                                                            rating < 1 ||
+                                                            content.trim()
+                                                                .length < 10
+                                                        }
+                                                        onClick={() =>
+                                                            handleMarkReviewed(
+                                                                item.id,
+                                                            )
+                                                        }
+                                                    >
+                                                        Publish Review
+                                                    </Button>
+                                                </DialogFooter>
+                                            </DialogContent>
+                                        </Dialog>
+                                        <Dialog
+                                            open={pendingDeleteId === item.id}
+                                            onOpenChange={(open) =>
+                                                !open &&
+                                                setPendingDeleteId(null)
+                                            }
+                                        >
+                                            <DialogTrigger asChild>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="destructive"
+                                                            className="pointer-events-auto"
+                                                            onClick={() =>
+                                                                handleRemove(
+                                                                    item.id,
+                                                                )
+                                                            }
+                                                            aria-label="Delete from list"
+                                                        >
+                                                            <Trash2 className="size-4" />
+                                                        </Button>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        Remove from list
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </DialogTrigger>
+                                            <DialogContent>
+                                                <DialogHeader>
+                                                    <DialogTitle>
+                                                        Remove from list?
+                                                    </DialogTitle>
+                                                    <DialogDescription>
+                                                        This will remove{' '}
+                                                        <span className="font-medium">
+                                                            {item.book.title}
+                                                        </span>{' '}
+                                                        from your to-review
+                                                        list.
+                                                    </DialogDescription>
+                                                </DialogHeader>
+                                                <DialogFooter>
+                                                    <DialogClose asChild>
+                                                        <Button
+                                                            variant="outline"
+                                                            type="button"
+                                                        >
+                                                            Cancel
+                                                        </Button>
+                                                    </DialogClose>
+                                                    <Button
+                                                        variant="destructive"
+                                                        type="button"
+                                                        onClick={confirmRemove}
+                                                    >
+                                                        Delete
+                                                    </Button>
+                                                </DialogFooter>
+                                            </DialogContent>
+                                        </Dialog>
+                                    </div>
+
+                                    {/* Mobile Persistent Actions */}
+                                    <div className="pointer-events-auto flex items-center gap-2 p-2 sm:hidden">
+                                        <Dialog
+                                            open={openId === item.id}
+                                            onOpenChange={(open) => {
+                                                if (open) {
+                                                    setOpenId(item.id);
+                                                } else {
+                                                    setOpenId(null);
+                                                    resetForm();
+                                                }
+                                            }}
+                                        >
+                                            <DialogTrigger asChild>
+                                                <Button
+                                                    size="sm"
+                                                    variant="secondary"
+                                                    className="flex-1"
+                                                    onClick={() =>
+                                                        setOpenId(item.id)
+                                                    }
+                                                >
+                                                    Review
+                                                </Button>
+                                            </DialogTrigger>
+                                            <DialogContent>
+                                                <DialogHeader>
+                                                    <DialogTitle>
+                                                        Quick Review
+                                                    </DialogTitle>
+                                                    <DialogDescription>
+                                                        {item.book.title} by{' '}
+                                                        {item.book.author}
+                                                    </DialogDescription>
+                                                </DialogHeader>
+                                                <div className="space-y-4">
+                                                    <div className="space-y-2">
+                                                        <label className="text-sm font-medium">
+                                                            Rating
+                                                        </label>
+                                                        <StarRating
+                                                            rating={rating}
+                                                            onRatingChange={
+                                                                setRating
+                                                            }
+                                                        />
+                                                        <p className="text-muted-foreground text-xs">
+                                                            {rating > 0
+                                                                ? `${rating}/5 stars`
+                                                                : 'Select a rating'}
+                                                        </p>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <label
+                                                            htmlFor="content"
+                                                            className="text-sm font-medium"
+                                                        >
+                                                            Review
+                                                        </label>
+                                                        <Textarea
+                                                            id="content"
+                                                            value={content}
+                                                            onChange={(e) =>
+                                                                setContent(
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            placeholder="Share a brief review (min 10 characters)"
+                                                            className="min-h-[140px]"
+                                                        />
+                                                        <p className="text-muted-foreground text-xs">
+                                                            Minimum 10
+                                                            characters.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <DialogFooter>
+                                                    <DialogClose asChild>
+                                                        <Button
+                                                            variant="outline"
+                                                            type="button"
+                                                        >
+                                                            Cancel
+                                                        </Button>
+                                                    </DialogClose>
+                                                    <Button
+                                                        type="button"
+                                                        disabled={
+                                                            rating < 1 ||
+                                                            content.trim()
+                                                                .length < 10
+                                                        }
+                                                        onClick={() =>
+                                                            handleMarkReviewed(
+                                                                item.id,
+                                                            )
+                                                        }
+                                                    >
+                                                        Publish Review
+                                                    </Button>
+                                                </DialogFooter>
+                                            </DialogContent>
+                                        </Dialog>
+
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button
+                                                    size="icon"
+                                                    variant="outline"
+                                                    aria-label="More actions"
+                                                >
+                                                    <MoreHorizontal className="size-5" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <Dialog
+                                                    open={
+                                                        pendingDeleteId ===
+                                                        item.id
+                                                    }
+                                                    onOpenChange={(open) =>
+                                                        !open &&
+                                                        setPendingDeleteId(null)
+                                                    }
+                                                >
+                                                    <DialogTrigger asChild>
+                                                        <div>
+                                                            <DropdownMenuItem
+                                                                onSelect={(
+                                                                    e,
+                                                                ) => {
+                                                                    e.preventDefault();
+                                                                    handleRemove(
+                                                                        item.id,
+                                                                    );
+                                                                }}
+                                                                variant="destructive"
+                                                            >
+                                                                <Trash2 className="size-4" />{' '}
+                                                                Delete
+                                                            </DropdownMenuItem>
+                                                        </div>
+                                                    </DialogTrigger>
+                                                    <DialogContent>
+                                                        <DialogHeader>
+                                                            <DialogTitle>
+                                                                Remove from
+                                                                list?
+                                                            </DialogTitle>
+                                                            <DialogDescription>
+                                                                This will remove{' '}
+                                                                <span className="font-medium">
+                                                                    {
+                                                                        item
+                                                                            .book
+                                                                            .title
+                                                                    }
+                                                                </span>{' '}
+                                                                from your
+                                                                to-review list.
+                                                            </DialogDescription>
+                                                        </DialogHeader>
+                                                        <DialogFooter>
+                                                            <DialogClose
+                                                                asChild
+                                                            >
+                                                                <Button
+                                                                    variant="outline"
+                                                                    type="button"
+                                                                >
+                                                                    Cancel
+                                                                </Button>
+                                                            </DialogClose>
+                                                            <Button
+                                                                variant="destructive"
+                                                                type="button"
+                                                                onClick={
+                                                                    confirmRemove
+                                                                }
+                                                            >
+                                                                Delete
+                                                            </Button>
+                                                        </DialogFooter>
+                                                    </DialogContent>
+                                                </Dialog>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
                                 </div>
 
                                 {/* Date Added */}
-                                <p className="mt-2 text-center text-xs text-muted-foreground">
+                                <p className="text-muted-foreground mt-2 text-center text-xs">
                                     Added{' '}
                                     {new Date(
                                         item.added_at,

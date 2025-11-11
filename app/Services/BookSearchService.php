@@ -2,14 +2,23 @@
 
 namespace App\Services;
 
+use App\Models\Book;
+use App\Models\BookCacheMetadata;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\RateLimiter;
 
 class BookSearchService
 {
     protected const OPENLIBRARY_API = 'https://openlibrary.org/search.json';
 
-    protected const CACHE_DURATION = 60 * 60 * 24; // 24 hours
+    protected const CACHE_DURATION_SEARCH = 60 * 60 * 72; // 72 hours for search results
+
+    protected const CACHE_DURATION_DETAILS = 60 * 60 * 24 * 30; // 30 days for book details
+
+    protected const CACHE_DURATION_COVERS = 60 * 60 * 24 * 60; // 60 days for covers
+
+    protected const RATE_LIMIT_PER_MINUTE = 30;
 
     /**
      * Search for books from Open Library API
@@ -22,7 +31,14 @@ class BookSearchService
     {
         $cacheKey = $this->getCacheKey('search', $query, $author);
 
-        return Cache::remember($cacheKey, self::CACHE_DURATION, function () use ($query, $author) {
+        return Cache::remember($cacheKey, self::CACHE_DURATION_SEARCH, function () use ($query, $author) {
+            // Check rate limit
+            if (! $this->checkRateLimit()) {
+                \Log::warning('Book search rate limit exceeded', ['query' => $query, 'author' => $author]);
+
+                return [];
+            }
+
             try {
                 $params = [
                     'q' => $query,
@@ -57,7 +73,14 @@ class BookSearchService
     {
         $cacheKey = $this->getCacheKey('external', $externalId);
 
-        return Cache::remember($cacheKey, self::CACHE_DURATION, function () use ($externalId) {
+        return Cache::remember($cacheKey, self::CACHE_DURATION_DETAILS, function () use ($externalId) {
+            // Check rate limit
+            if (! $this->checkRateLimit()) {
+                \Log::warning('Book details rate limit exceeded', ['externalId' => $externalId]);
+
+                return null;
+            }
+
             try {
                 $url = "https://openlibrary.org{$externalId}.json";
                 $response = Http::timeout(10)->get($url);
@@ -73,6 +96,44 @@ class BookSearchService
                 return null;
             }
         });
+    }
+
+    /**
+     * Batch fetch book metadata for multiple external IDs
+     *
+     * @param  array  $externalIds  Array of Open Library IDs
+     * @return array Array of book data keyed by external ID
+     */
+    public function batchGetFromExternalIds(array $externalIds): array
+    {
+        $results = [];
+        $uncachedIds = [];
+
+        // Check cache first
+        foreach ($externalIds as $id) {
+            $cacheKey = $this->getCacheKey('external', $id);
+            $cached = Cache::get($cacheKey);
+            if ($cached !== null) {
+                $results[$id] = $cached;
+            } else {
+                $uncachedIds[] = $id;
+            }
+        }
+
+        // Fetch uncached items with rate limiting
+        foreach ($uncachedIds as $id) {
+            if (! $this->checkRateLimit()) {
+                \Log::warning('Batch fetch rate limit exceeded');
+                break;
+            }
+
+            $bookData = $this->getFromExternalId($id);
+            if ($bookData) {
+                $results[$id] = $bookData;
+            }
+        }
+
+        return $results;
     }
 
     /**
@@ -164,5 +225,42 @@ class BookSearchService
         }
 
         return 'books:'.hash('sha256', $key);
+    }
+
+    /**
+     * Check rate limit for API calls
+     */
+    protected function checkRateLimit(): bool
+    {
+        $key = 'ol_api_rate_limit';
+        $limit = RateLimiter::attempt($key, self::RATE_LIMIT_PER_MINUTE, function () {
+            return true;
+        }, 60);
+
+        return $limit;
+    }
+
+    /**
+     * Get the number of API calls used this minute
+     */
+    public function getRateLimitUsage(): int
+    {
+        $key = 'ol_api_rate_limit';
+
+        return RateLimiter::attempts($key);
+    }
+
+    /**
+     * Record cache metadata for tracking purposes
+     */
+    protected function recordCacheMetadata(int $bookId, string $cacheKey, int $expiresInSeconds): void
+    {
+        BookCacheMetadata::updateOrCreate(
+            ['book_id' => $bookId, 'cache_key' => $cacheKey],
+            [
+                'expires_at' => now()->addSeconds($expiresInSeconds),
+                'hit_count' => \DB::raw('hit_count + 1'),
+            ]
+        );
     }
 }

@@ -20,13 +20,23 @@ class Book extends Model
         'external_id',
         'published_year',
         'publisher',
+        'ol_last_synced_at',
+        'ol_sync_status',
+        'cached_from_ol',
     ];
 
     protected function casts(): array
     {
         return [
             'published_year' => 'integer',
+            'ol_last_synced_at' => 'datetime',
+            'cached_from_ol' => 'boolean',
         ];
+    }
+
+    public function cacheMetadata(): HasMany
+    {
+        return $this->hasMany(BookCacheMetadata::class);
     }
 
     public function reviews(): HasMany
