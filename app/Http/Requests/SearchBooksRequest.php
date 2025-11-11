@@ -21,7 +21,7 @@ class SearchBooksRequest extends FormRequest
             'q' => $isApiRequest ? ['required', 'string', 'min:2', 'max:255'] : ['nullable', 'string', 'min:2', 'max:255'],
             'query' => ['nullable', 'string', 'min:2', 'max:255'],
             'author' => ['nullable', 'string', 'max:255'],
-            'online' => ['nullable', 'boolean'],
+            'online' => ['nullable', 'in:true,false,0,1'],
             'page' => ['nullable', 'integer', 'min:1'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
         ];
