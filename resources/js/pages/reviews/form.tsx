@@ -1,3 +1,4 @@
+import CreateBookDialog from '@/components/CreateBookDialog';
 import { EmptyState } from '@/components/EmptyState';
 import ReviewEditor from '@/components/ReviewEditor';
 import StarRating from '@/components/StarRating';
@@ -47,6 +48,7 @@ export default function ReviewForm({
     const [bookId, setBookId] = React.useState<string | number | undefined>(
         isEdit ? review?.book_id : (selectedBookId ?? undefined),
     );
+    const [showCreateDialog, setShowCreateDialog] = React.useState(false);
 
     const findById = React.useCallback(
         (id: string | number | undefined) =>
@@ -70,6 +72,12 @@ export default function ReviewForm({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={isEdit ? 'Edit Review' : 'Write a Review'} />
+
+            <CreateBookDialog
+                open={showCreateDialog}
+                onOpenChange={setShowCreateDialog}
+                onSuccess={() => router.reload({ only: ['books'] })}
+            />
 
             <div className="flex flex-1 flex-col gap-6 overflow-x-auto rounded-xl p-4">
                 <div>
@@ -148,16 +156,28 @@ export default function ReviewForm({
                                     </div>
                                 ) : (
                                     <div className="space-y-2">
-                                        <label
-                                            className="text-sm font-medium"
-                                            htmlFor="book_id"
-                                        >
-                                            Book
-                                        </label>
+                                        <div className="flex items-center justify-between">
+                                            <label
+                                                className="text-sm font-medium"
+                                                htmlFor="book_id"
+                                            >
+                                                Book
+                                            </label>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() =>
+                                                    setShowCreateDialog(true)
+                                                }
+                                            >
+                                                Add Book Manually
+                                            </Button>
+                                        </div>
                                         {books.length === 0 ? (
                                             <EmptyState
                                                 title="No books available"
-                                                description="Search for books first before writing a review."
+                                                description="Search for books or add one manually using the button above."
                                                 action={{
                                                     label: 'Browse & add books',
                                                     onClick: () =>
