@@ -286,15 +286,26 @@ export default function BooksSearch({
                                     </span>
                                 )}
                             </div>
-                            {hasOnlineOption && (
+                            {searchMode === 'local' ? (
                                 <Button
                                     onClick={handleFindOnline}
                                     variant="outline"
                                     size="sm"
                                     disabled={isLoading}
                                 >
-                                    Find Online
+                                    Search More Online
                                 </Button>
+                            ) : (
+                                hasOnlineOption && (
+                                    <Button
+                                        onClick={handleFindOnline}
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={isLoading}
+                                    >
+                                        Find Online
+                                    </Button>
+                                )
                             )}
                         </div>
 
