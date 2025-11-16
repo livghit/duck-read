@@ -56,6 +56,23 @@ export default function BooksSearch({
     query = null,
     books = null,
 }: BooksSearchProps) {
+    // Helper function to get unique identifier for a book
+    const getBookKey = (book: Book): string => {
+        // For local books with numeric IDs, use the ID
+        if (typeof book.id === 'number' && book.id > 0) {
+            return `local-${book.id}`;
+        }
+        // For online books, use external_id or ol_work_key
+        if (book.external_id) {
+            return `external-${book.external_id}`;
+        }
+        if (book.ol_work_key) {
+            return `work-${book.ol_work_key}`;
+        }
+        // Fallback to title+author (shouldn't happen with our data)
+        return `fallback-${book.title}-${book.author}`;
+    };
+
     // Ensure local state is always a string
     const [searchQuery, setSearchQuery] = useState<string>(query ?? '');
     const [isLoading, setIsLoading] = useState(false);
@@ -69,9 +86,7 @@ export default function BooksSearch({
     const [savingBookId, setSavingBookId] = useState<string | number | null>(
         null,
     );
-    const [addedBookIds, setAddedBookIds] = useState<Set<string | number>>(
-        new Set(),
-    );
+    const [addedBookIds, setAddedBookIds] = useState<Set<string>>(new Set());
 
     // Keep local state in sync when server-provided query changes between visits
     useEffect(() => {
@@ -205,8 +220,9 @@ export default function BooksSearch({
                 },
                 onSuccess: (page) => {
                     console.log('Book added successfully!', page);
-                    // Add book to the set of added books
-                    setAddedBookIds((prev) => new Set(prev).add(book.id));
+                    // Add book to the set of added books using unique key
+                    const bookKey = getBookKey(book);
+                    setAddedBookIds((prev) => new Set(prev).add(bookKey));
                 },
                 onError: (errors) => {
                     console.error('Error adding book:', errors);
@@ -301,7 +317,9 @@ export default function BooksSearch({
                                             handleAddToReviewList(e, book),
                                         label: 'Add to review list',
                                         variant: 'ghost',
-                                        isActive: addedBookIds.has(book.id),
+                                        isActive: addedBookIds.has(
+                                            getBookKey(book),
+                                        ),
                                     }}
                                 />
                             ))}
