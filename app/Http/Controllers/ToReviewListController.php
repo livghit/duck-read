@@ -7,6 +7,7 @@ use App\Http\Requests\StoreToReviewRequest;
 use App\Models\Book;
 use App\Models\ToReviewList;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Response as HttpResponse;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -30,7 +31,7 @@ class ToReviewListController extends Controller
         ]);
     }
 
-    public function store(StoreToReviewRequest $request): RedirectResponse
+    public function store(StoreToReviewRequest $request): RedirectResponse|HttpResponse
     {
         $validated = $request->validated();
 
@@ -59,6 +60,10 @@ class ToReviewListController extends Controller
 
         // Validate we have a book_id
         if (! $bookId) {
+            if ($request->header('X-Inertia')) {
+                return response()->noContent(409);
+            }
+
             return back()->withErrors(['book_id' => 'A book must be selected.']);
         }
 
@@ -67,6 +72,10 @@ class ToReviewListController extends Controller
             ->first();
 
         if ($existing) {
+            if ($request->header('X-Inertia')) {
+                return response()->noContent();
+            }
+
             return back()->with('info', 'Book is already in your review list.');
         }
 
@@ -74,6 +83,10 @@ class ToReviewListController extends Controller
             'book_id' => $bookId,
             'added_at' => now(),
         ]);
+
+        if ($request->header('X-Inertia')) {
+            return response()->noContent();
+        }
 
         return back()->with('success', 'Book added to your review list!');
     }

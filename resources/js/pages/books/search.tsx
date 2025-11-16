@@ -199,14 +199,19 @@ export default function BooksSearch({
             {
                 preserveScroll: true,
                 preserveState: true,
-                only: [],
-                onSuccess: () => {
-                    console.log('Book added successfully!');
+                onBefore: () => {
+                    console.log('About to add book to review list');
+                },
+                onSuccess: (page) => {
+                    console.log('Book added successfully!', page);
                     // Add book to the set of added books
                     setAddedBookIds((prev) => new Set(prev).add(book.id));
                 },
                 onError: (errors) => {
                     console.error('Error adding book:', errors);
+                },
+                onFinish: () => {
+                    console.log('Request finished');
                 },
             },
         );
