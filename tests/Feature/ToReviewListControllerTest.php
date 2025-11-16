@@ -109,7 +109,8 @@ describe('ToReviewListController', function () {
                 'book_id' => $book->id,
             ]);
 
-            $response->assertRedirect(route('to-review-lists.index'));
+            $response->assertRedirect();
+            $response->assertSessionHas('success');
 
             $this->assertDatabaseHas('to_review_lists', [
                 'user_id' => $user->id,
@@ -129,7 +130,8 @@ describe('ToReviewListController', function () {
                 'book_id' => $book->id,
             ]);
 
-            $response->assertSessionHasErrors('book_id');
+            $response->assertRedirect();
+            $response->assertSessionHas('info');
         });
 
         it('requires authentication', function () {
@@ -142,12 +144,74 @@ describe('ToReviewListController', function () {
             $response->assertRedirect(route('login'));
         });
 
-        it('validates book_id is required', function () {
+        it('validates book_id or title is required', function () {
             $user = User::factory()->create();
 
             $response = $this->actingAs($user)->post(route('to-review-lists.store'), []);
 
-            $response->assertSessionHasErrors('book_id');
+            $response->assertSessionHasErrors(['book_id', 'title']);
+        });
+
+        it('creates book from online search data when adding to review list', function () {
+            $user = User::factory()->create();
+
+            $bookData = [
+                'title' => 'The Great Gatsby',
+                'author' => 'F. Scott Fitzgerald',
+                'isbn' => '9780743273565',
+                'external_id' => 'OL12345M',
+                'ol_work_key' => '/works/OL468516W',
+                'cover_url' => 'https://covers.openlibrary.org/b/id/12345-L.jpg',
+                'publisher' => 'Scribner',
+                'publish_date' => 1925,
+            ];
+
+            $response = $this->actingAs($user)->post(route('to-review-lists.store'), $bookData);
+
+            $response->assertRedirect();
+            $response->assertSessionHas('success');
+
+            // Verify book was created
+            $this->assertDatabaseHas('books', [
+                'title' => 'The Great Gatsby',
+                'author' => 'F. Scott Fitzgerald',
+                'external_id' => 'OL12345M',
+            ]);
+
+            // Verify it was added to to-review list
+            $book = Book::where('external_id', 'OL12345M')->first();
+            $this->assertDatabaseHas('to_review_lists', [
+                'user_id' => $user->id,
+                'book_id' => $book->id,
+            ]);
+        });
+
+        it('uses existing book when external_id matches', function () {
+            $user = User::factory()->create();
+            $existingBook = Book::factory()->create([
+                'external_id' => 'OL12345M',
+                'title' => 'Existing Book',
+            ]);
+
+            $bookData = [
+                'title' => 'The Great Gatsby',
+                'author' => 'F. Scott Fitzgerald',
+                'external_id' => 'OL12345M',
+            ];
+
+            $response = $this->actingAs($user)->post(route('to-review-lists.store'), $bookData);
+
+            $response->assertRedirect();
+            $response->assertSessionHas('success');
+
+            // Should use the existing book, not create a new one
+            $this->assertEquals(1, Book::where('external_id', 'OL12345M')->count());
+
+            // Should be added to the to-review list with the existing book
+            $this->assertDatabaseHas('to_review_lists', [
+                'user_id' => $user->id,
+                'book_id' => $existingBook->id,
+            ]);
         });
     });
 

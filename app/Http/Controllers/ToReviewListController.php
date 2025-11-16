@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\MarkReviewedRequest;
 use App\Http\Requests\StoreToReviewRequest;
+use App\Models\Book;
 use App\Models\ToReviewList;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -33,22 +34,48 @@ class ToReviewListController extends Controller
     {
         $validated = $request->validated();
 
+        $bookId = $validated['book_id'] ?? null;
+
+        // If we have full book data (from online search), save the book first
+        if (isset($validated['title'])) {
+            // Check if book already exists by external_id
+            $book = null;
+            if (! empty($validated['external_id'])) {
+                $book = Book::where('external_id', $validated['external_id'])->first();
+            }
+
+            // Create the book if it doesn't exist
+            if (! $book) {
+                $book = Book::create($validated);
+
+                // Dispatch background job to fetch work details
+                if ($book->ol_work_key) {
+                    \App\Jobs\FetchBookWorkDetails::dispatch($book);
+                }
+            }
+
+            $bookId = $book->id;
+        }
+
+        // Validate we have a book_id
+        if (! $bookId) {
+            return back()->withErrors(['book_id' => 'A book must be selected.']);
+        }
+
         $existing = ToReviewList::where('user_id', auth()->id())
-            ->where('book_id', $validated['book_id'])
+            ->where('book_id', $bookId)
             ->first();
 
         if ($existing) {
-            return back()->withErrors([
-                'book_id' => 'Book is already in your to-review list.',
-            ]);
+            return back()->with('info', 'Book is already in your review list.');
         }
 
         auth()->user()->toReviewLists()->create([
-            'book_id' => $validated['book_id'],
+            'book_id' => $bookId,
             'added_at' => now(),
         ]);
 
-        return redirect()->route('to-review-lists.index');
+        return back()->with('success', 'Book added to your review list!');
     }
 
     public function destroy(ToReviewList $toReviewList): RedirectResponse

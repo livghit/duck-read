@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
+import { Heart } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 interface Book {
@@ -14,6 +15,10 @@ interface Book {
     author: string;
     cover_url?: string | null;
     isbn?: string;
+    external_id?: string;
+    ol_work_key?: string;
+    publisher?: string;
+    publish_date?: number;
 }
 
 interface SearchApiResponse {
@@ -122,6 +127,40 @@ export default function BooksSearch({
         router.visit(`/books/${book.id}`);
     };
 
+    const handleAddToReviewList = (e: React.MouseEvent, book: Book) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        console.log('Adding book to review list:', book);
+
+        // Use Inertia to post the book data
+        router.post(
+            '/to-review-lists',
+            {
+                book_id: typeof book.id === 'number' ? book.id : undefined,
+                title: book.title,
+                author: book.author,
+                isbn: book.isbn,
+                cover_url: book.cover_url,
+                external_id: book.external_id,
+                ol_work_key: book.ol_work_key,
+                publisher: book.publisher,
+                publish_date: book.publish_date,
+            },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                only: [],
+                onSuccess: () => {
+                    console.log('Book added successfully!');
+                },
+                onError: (errors) => {
+                    console.error('Error adding book:', errors);
+                },
+            },
+        );
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Search Books" />
@@ -193,11 +232,18 @@ export default function BooksSearch({
                         )}
 
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                            {searchResults.map((book) => (
+                            {searchResults.map((book, index) => (
                                 <BookCard
-                                    key={book.id}
+                                    key={`${book.external_id || book.id}-${index}`}
                                     book={book}
                                     onClick={() => handleBookClick(book)}
+                                    actionButton={{
+                                        icon: <Heart className="h-4 w-4" />,
+                                        onClick: (e) =>
+                                            handleAddToReviewList(e, book),
+                                        label: 'Add to review list',
+                                        variant: 'ghost',
+                                    }}
                                 />
                             ))}
                         </div>

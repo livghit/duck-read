@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
@@ -12,12 +13,22 @@ interface BookCardProps {
     };
     onClick?: () => void;
     className?: string;
+    actionButton?: {
+        icon: React.ReactNode;
+        onClick: (e: React.MouseEvent) => void;
+        label: string;
+        variant?: 'default' | 'ghost' | 'outline';
+    };
 }
 
-export default function BookCard({ book, onClick, className }: BookCardProps) {
+export default function BookCard({
+    book,
+    onClick,
+    className,
+    actionButton,
+}: BookCardProps) {
     return (
         <Card
-            onClick={onClick}
             className={cn(
                 'overflow-hidden transition-all hover:shadow-lg dark:hover:shadow-lg/20',
                 onClick && 'cursor-pointer',
@@ -26,7 +37,10 @@ export default function BookCard({ book, onClick, className }: BookCardProps) {
         >
             <CardContent className="p-0">
                 <div className="flex h-full flex-col">
-                    <div className="relative aspect-[2/3] w-full overflow-hidden bg-muted">
+                    <div
+                        onClick={onClick}
+                        className="relative aspect-[2/3] w-full overflow-hidden bg-muted"
+                    >
                         <img
                             src={(function () {
                                 const placeholder =
@@ -48,9 +62,26 @@ export default function BookCard({ book, onClick, className }: BookCardProps) {
                                     'https://placehold.co/600x900?text=No%20Cover';
                             }}
                         />
+                        {actionButton && (
+                            <div className="absolute right-2 bottom-2 z-10">
+                                <Button
+                                    type="button"
+                                    size="icon"
+                                    variant={actionButton.variant ?? 'default'}
+                                    onClick={actionButton.onClick}
+                                    className="h-8 w-8 rounded-full shadow-lg"
+                                    aria-label={actionButton.label}
+                                >
+                                    {actionButton.icon}
+                                </Button>
+                            </div>
+                        )}
                     </div>
 
-                    <div className="flex flex-1 flex-col gap-2 p-3">
+                    <div
+                        onClick={onClick}
+                        className="flex flex-1 flex-col gap-2 p-3"
+                    >
                         <div>
                             <h3 className="line-clamp-2 text-sm leading-tight font-semibold">
                                 {book.title}
