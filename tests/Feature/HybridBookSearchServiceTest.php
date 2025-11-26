@@ -5,12 +5,15 @@ use App\Services\BookSearchService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\RateLimiter;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->service = app(BookSearchService::class);
     Cache::clear();
+    RateLimiter::clear('ol_api_rate_limit');
+    RateLimiter::clear('ol_api_rate_limit:ip:unknown');
 });
 
 describe('BookSearchService - Hybrid Search', function () {
@@ -258,6 +261,19 @@ describe('BookSearchService - Hybrid Search', function () {
                 'title' => 'Unsaved Book',
             ]);
         });
+
+        it('returns disabled message when Open Library is disabled', function () {
+            config(['services.openlibrary.enabled' => false]);
+            Http::fake(); // Should not be called
+
+            $result = $this->service->searchOnline('disabled');
+
+            expect($result->books)->toBeEmpty();
+            expect($result->onlineDisabled)->toBeTrue();
+            expect($result->message)->toContain('disabled');
+
+            Http::assertNothingSent();
+        });
     });
 
     describe('saveSearchResults()', function () {
@@ -379,22 +395,71 @@ describe('BookSearchService - Hybrid Search', function () {
     });
 
     describe('rate limiting', function () {
-        it('respects rate limit', function () {
+        it('returns rate limited flag and message when exceeding limits', function () {
             Http::fake([
                 'openlibrary.org/search.json*' => Http::response(['docs' => []]),
             ]);
 
-            // Make 30 calls (at limit)
-            for ($i = 0; $i < 30; $i++) {
+            config([
+                'services.openlibrary.rate_limit' => 3,
+                'services.openlibrary.rate_limit_per_user' => 3,
+            ]);
+
+            // Hit the limit
+            for ($i = 0; $i < 3; $i++) {
                 $this->service->searchOnline("query{$i}");
             }
 
-            // 31st call should hit rate limit
-            $result = $this->service->searchOnline('query31');
-            expect($result->books)->toBeEmpty();
+            // Next call should be rate limited
+            $result = $this->service->searchOnline('query-over');
 
-            // Should have made exactly 30 API calls
-            Http::assertSentCount(30);
+            expect($result->books)->toBeEmpty();
+            expect($result->rateLimited)->toBeTrue();
+            expect($result->message)->toContain('temporarily limited');
+
+            Http::assertSentCount(3);
+        });
+
+        it('does not cache rate limited responses', function () {
+            Http::fake([
+                'openlibrary.org/search.json*' => Http::response([
+                    'docs' => [
+                        [
+                            'title' => 'Limited Book',
+                            'author_name' => ['Author'],
+                            'key' => '/works/OL1W',
+                            'cover_i' => 1,
+                        ],
+                    ],
+                ]),
+            ]);
+
+            config([
+                'services.openlibrary.rate_limit' => 1,
+                'services.openlibrary.rate_limit_per_user' => 1,
+            ]);
+
+            // Exhaust the limit before calling the search method
+            RateLimiter::hit('ol_api_rate_limit');
+            RateLimiter::hit('ol_api_rate_limit:ip:unknown');
+
+            $result = $this->service->searchOnline('limited');
+            expect($result->rateLimited)->toBeTrue();
+            Http::assertNothingSent();
+
+            RateLimiter::clear('ol_api_rate_limit');
+            RateLimiter::clear('ol_api_rate_limit:ip:unknown');
+
+            config([
+                'services.openlibrary.rate_limit' => 10,
+                'services.openlibrary.rate_limit_per_user' => 10,
+            ]);
+
+            $freshResult = $this->service->searchOnline('limited');
+
+            expect($freshResult->books)->toHaveCount(1);
+            expect($freshResult->rateLimited)->toBeFalse();
+            Http::assertSentCount(1);
         });
     });
 

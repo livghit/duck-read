@@ -7,7 +7,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import { Heart } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface Book {
     id: string | number;
@@ -29,6 +29,8 @@ interface SearchApiResponse {
     total_count: number;
     source: 'local' | 'online';
     message: string;
+    rate_limited?: boolean;
+    online_disabled?: boolean;
 }
 
 interface Paginator<T> {
@@ -87,6 +89,9 @@ export default function BooksSearch({
         null,
     );
     const [addedBookIds, setAddedBookIds] = useState<Set<string>>(new Set());
+    const [rateLimited, setRateLimited] = useState(false);
+    const [onlineDisabled, setOnlineDisabled] = useState(false);
+    const searchTimeout = useRef<number | null>(null);
 
     // Keep local state in sync when server-provided query changes between visits
     useEffect(() => {
@@ -100,6 +105,8 @@ export default function BooksSearch({
         setIsLoading(true);
         setError(null);
         setSearchResults([]);
+        setRateLimited(false);
+        setOnlineDisabled(false);
 
         try {
             const response = await fetch(
@@ -127,9 +134,17 @@ export default function BooksSearch({
             setSearchMode(data.is_local ? 'local' : 'online');
             setHasOnlineOption(data.has_online_option);
             setSearchMessage(data.message);
+            setRateLimited(Boolean(data.rate_limited));
+            setOnlineDisabled(Boolean(data.online_disabled));
 
             // Auto-trigger online search if local search returned no results
-            if (!online && data.books.length === 0 && data.has_online_option) {
+            if (
+                !online &&
+                data.books.length === 0 &&
+                data.has_online_option &&
+                !data.rate_limited &&
+                !data.online_disabled
+            ) {
                 console.log(
                     'No local results found, searching online automatically...',
                 );
@@ -142,15 +157,19 @@ export default function BooksSearch({
             setError('Failed to search books. Please try again.');
             console.error('Search error:', err);
         } finally {
-            if (online || !hasOnlineOption) {
-                setIsLoading(false);
-            }
+            setIsLoading(false);
         }
     };
 
-    const handleSearch = async () => {
-        // Start with local search (online defaults to false)
-        await performSearch(false);
+    const handleSearch = () => {
+        // Debounce to avoid rapid repeat calls
+        if (searchTimeout.current) {
+            window.clearTimeout(searchTimeout.current);
+        }
+
+        searchTimeout.current = window.setTimeout(() => {
+            void performSearch(false);
+        }, 200);
     };
 
     const handleFindOnline = async () => {
@@ -313,6 +332,13 @@ export default function BooksSearch({
                             <p className="text-xs text-muted-foreground italic">
                                 {searchMessage}
                             </p>
+                        )}
+                        {(rateLimited || onlineDisabled) && (
+                            <div className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                                {rateLimited
+                                    ? 'Online search is temporarily limited. Please try again in a bit.'
+                                    : 'Online search is currently disabled.'}
+                            </div>
                         )}
 
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

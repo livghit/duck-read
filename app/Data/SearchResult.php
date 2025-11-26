@@ -14,6 +14,8 @@ class SearchResult
         public int $totalCount = 0,
         public string $source = 'local',
         public ?string $message = null,
+        public bool $rateLimited = false,
+        public bool $onlineDisabled = false,
     ) {}
 
     /**
@@ -38,6 +40,8 @@ class SearchResult
             'total_count' => $this->totalCount,
             'source' => $this->source,
             'message' => $this->message,
+            'rate_limited' => $this->rateLimited,
+            'online_disabled' => $this->onlineDisabled,
         ];
     }
 
@@ -54,13 +58,15 @@ class SearchResult
             totalCount: $books->count(),
             source: 'local',
             message: $message ?? ($books->isEmpty() ? 'No local results found. Try searching online.' : 'Results from your library'),
+            rateLimited: false,
+            onlineDisabled: false,
         );
     }
 
     /**
      * Create an online search result
      */
-    public static function online(Collection $books, string $query, int $totalCount = 0, ?string $message = null): self
+    public static function online(Collection $books, string $query, int $totalCount = 0, ?string $message = null, bool $rateLimited = false, bool $onlineDisabled = false): self
     {
         return new self(
             isLocal: false,
@@ -70,6 +76,8 @@ class SearchResult
             totalCount: $totalCount > 0 ? $totalCount : $books->count(),
             source: 'online',
             message: $message ?? 'Results from Open Library. These will be saved to your library.',
+            rateLimited: $rateLimited,
+            onlineDisabled: $onlineDisabled,
         );
     }
 }

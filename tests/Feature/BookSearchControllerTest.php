@@ -193,6 +193,8 @@ describe('BookSearchController', function () {
                 'total_count',
                 'source',
                 'message',
+                'rate_limited',
+                'online_disabled',
             ]);
         });
 

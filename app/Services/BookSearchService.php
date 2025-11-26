@@ -65,46 +65,23 @@ class BookSearchService
      */
     public function searchOnline(string $query): SearchResult
     {
+        if (! config('services.openlibrary.enabled')) {
+            return SearchResult::online(
+                collect(),
+                $query,
+                0,
+                'Online search is disabled right now.',
+                rateLimited: false,
+                onlineDisabled: true,
+            );
+        }
+
         $cacheKey = $this->getCacheKey('search', $query);
 
-        // Cache the API response
-        $cached = Cache::remember($cacheKey, self::CACHE_DURATION_SEARCH, function () use ($query) {
-            // Check rate limit
-            if (! $this->checkRateLimit()) {
-                \Log::warning('Book search rate limit exceeded', ['query' => $query]);
-
-                return ['raw' => [], 'formatted' => []];
-            }
-
-            try {
-                $response = Http::timeout(10)->get(config('services.openlibrary.api_url'), [
-                    'q' => $query,
-                    'limit' => 20,
-                ]);
-
-                if ($response->failed()) {
-                    return ['raw' => [], 'formatted' => []];
-                }
-
-                $data = $response->json();
-                $raw = $data['docs'] ?? [];
-
-                // Filter out books without covers
-                $rawFiltered = array_filter($raw, fn ($book) => isset($book['cover_i']) && $book['cover_i']);
-
-                return [
-                    'raw' => $rawFiltered,
-                    'formatted' => $this->formatSearchResults(['docs' => $rawFiltered]),
-                ];
-            } catch (\Exception $e) {
-                \Log::error('Book search failed: '.$e->getMessage());
-
-                return ['raw' => [], 'formatted' => []];
-            }
-        });
+        $cached = $this->getCachedOnlineResults($cacheKey, $query);
 
         // Convert formatted results to collection of books (not saved to DB yet)
-        $books = collect($cached['formatted'])->map(function ($bookData) {
+        $books = collect($cached['formatted'] ?? [])->map(function ($bookData) {
             // Create a Book model instance without saving it
             $book = new Book($bookData);
             $book->id = $bookData['external_id'] ?? null; // Use external_id as temporary ID for display
@@ -112,7 +89,14 @@ class BookSearchService
             return $book;
         });
 
-        return SearchResult::online($books, $query, count($cached['formatted']));
+        return SearchResult::online(
+            $books,
+            $query,
+            count($cached['formatted'] ?? []),
+            $cached['message'] ?? null,
+            rateLimited: $cached['rate_limited'] ?? false,
+            onlineDisabled: $cached['online_disabled'] ?? false,
+        );
     }
 
     /**
@@ -429,12 +413,24 @@ class BookSearchService
      */
     protected function checkRateLimit(): bool
     {
-        $key = 'ol_api_rate_limit';
-        $limit = RateLimiter::attempt($key, config('services.openlibrary.rate_limit'), function () {
-            return true;
-        }, 60);
+        $globalKey = 'ol_api_rate_limit';
+        $actorKey = 'ol_api_rate_limit:'.$this->rateLimiterActor();
 
-        return $limit;
+        $globalAllowed = RateLimiter::attempt(
+            $globalKey,
+            config('services.openlibrary.rate_limit'),
+            fn () => true,
+            60
+        );
+
+        $perActorAllowed = RateLimiter::attempt(
+            $actorKey,
+            config('services.openlibrary.rate_limit_per_user', 10),
+            fn () => true,
+            60
+        );
+
+        return $globalAllowed && $perActorAllowed;
     }
 
     /**
@@ -445,6 +441,102 @@ class BookSearchService
         $key = 'ol_api_rate_limit';
 
         return RateLimiter::attempts($key);
+    }
+
+    /**
+     * Prevent multiple identical cache misses from stampeding the API
+     */
+    protected function getCachedOnlineResults(string $cacheKey, string $query): array
+    {
+        $lock = Cache::lock($cacheKey.':lock', 5);
+
+        try {
+            return $lock->block(3, function () use ($cacheKey, $query) {
+                $cached = Cache::get($cacheKey);
+
+                if ($cached !== null) {
+                    return $cached;
+                }
+
+                $fresh = $this->fetchOnlineResults($query);
+
+                // Only cache successful/non-rate-limited responses
+                if (! ($fresh['rate_limited'] ?? false) && ! ($fresh['online_disabled'] ?? false)) {
+                    Cache::put($cacheKey, $fresh, self::CACHE_DURATION_SEARCH);
+                }
+
+                return $fresh;
+            });
+        } catch (\Throwable $e) {
+            \Log::warning('Book search cache lock timeout', [
+                'cacheKey' => $cacheKey,
+                'error' => $e->getMessage(),
+            ]);
+
+            return Cache::get($cacheKey) ?? ['raw' => [], 'formatted' => [], 'message' => null];
+        }
+    }
+
+    /**
+     * Fetch results from Open Library with rate limiting and filtering
+     */
+    protected function fetchOnlineResults(string $query): array
+    {
+        // Check rate limit
+        if (! $this->checkRateLimit()) {
+            \Log::warning('Book search rate limit exceeded', ['query' => $query]);
+
+            return [
+                'raw' => [],
+                'formatted' => [],
+                'rate_limited' => true,
+                'message' => 'Online search is temporarily limited. Please try again soon.',
+            ];
+        }
+
+        try {
+            $response = Http::timeout(10)->get(config('services.openlibrary.api_url'), [
+                'q' => $query,
+                'limit' => 20,
+            ]);
+
+            if ($response->failed()) {
+                return [
+                    'raw' => [],
+                    'formatted' => [],
+                    'message' => 'Online search failed. Please try again shortly.',
+                ];
+            }
+
+            $data = $response->json();
+            $raw = $data['docs'] ?? [];
+
+            // Filter out books without covers
+            $rawFiltered = array_filter($raw, fn ($book) => isset($book['cover_i']) && $book['cover_i']);
+
+            return [
+                'raw' => $rawFiltered,
+                'formatted' => $this->formatSearchResults(['docs' => $rawFiltered]),
+                'message' => 'Results from Open Library. These will be saved to your library.',
+            ];
+        } catch (\Exception $e) {
+            \Log::error('Book search failed: '.$e->getMessage());
+
+            return [
+                'raw' => [],
+                'formatted' => [],
+                'message' => 'Online search failed. Please try again shortly.',
+            ];
+        }
+    }
+
+    protected function rateLimiterActor(): string
+    {
+        if (auth()->check()) {
+            return 'user:'.auth()->id();
+        }
+
+        return 'ip:'.(request()?->ip() ?? 'unknown');
     }
 
     /**
