@@ -47,6 +47,12 @@ class BookController extends Controller
     {
         $bookWithRelations = $book->load('reviews');
 
+        $workKey = $this->resolveWorkKey($bookWithRelations);
+
+        if ($workKey && $this->shouldHydrateDetails($bookWithRelations)) {
+            $bookWithRelations = $this->hydrateBookDetails($bookWithRelations, $workKey);
+        }
+
         $userReview = auth()->user() ? $bookWithRelations->reviews()->where('user_id', auth()->id())->first() : null;
         $isInToReviewList = auth()->user() ? $book->toReviewLists()->where('user_id', auth()->id())->exists() : false;
 
@@ -122,5 +128,57 @@ class BookController extends Controller
         }
 
         return redirect()->route('books.show', $book);
+    }
+
+    private function resolveWorkKey(Book $book): ?string
+    {
+        if ($book->ol_work_key) {
+            return $book->ol_work_key;
+        }
+
+        if ($book->external_id && str_contains($book->external_id, '/works/')) {
+            return $book->external_id;
+        }
+
+        return null;
+    }
+
+    private function shouldHydrateDetails(Book $book): bool
+    {
+        if (app()->runningUnitTests()) {
+            return false;
+        }
+
+        if (! config('services.openlibrary.enabled')) {
+            return false;
+        }
+
+        $missingCoreMetadata = empty($book->description)
+            && empty($book->subjects)
+            && empty($book->excerpt)
+            && empty($book->first_publish_date)
+            && empty($book->links);
+
+        $staleMetadata = $book->last_synced_at === null || $book->last_synced_at->lt(now()->subDays(30));
+
+        return $missingCoreMetadata || $staleMetadata;
+    }
+
+    private function hydrateBookDetails(Book $book, string $workKey): Book
+    {
+        $details = $this->searchService->fetchWorkDetails($workKey);
+
+        if (! $details) {
+            return $book;
+        }
+
+        $book->fill(array_filter($details, static fn ($value) => $value !== null));
+        if (! $book->ol_work_key) {
+            $book->ol_work_key = $workKey;
+        }
+        $book->last_synced_at = now();
+        $book->save();
+
+        return $book->refresh()->load('reviews');
     }
 }

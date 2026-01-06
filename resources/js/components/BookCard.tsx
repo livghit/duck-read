@@ -13,6 +13,7 @@ interface BookCardProps {
     };
     onClick?: () => void;
     className?: string;
+    disableHover?: boolean;
     actionButton?: {
         icon: React.ReactNode;
         onClick: (e: React.MouseEvent) => void;
@@ -27,13 +28,16 @@ export default function BookCard({
     book,
     onClick,
     className,
+    disableHover = false,
     actionButton,
     isLoading = false,
 }: BookCardProps) {
     return (
         <Card
             className={cn(
-                'overflow-hidden transition-all hover:shadow-lg dark:hover:shadow-lg/20',
+                'overflow-hidden',
+                !disableHover &&
+                    'transition-all hover:shadow-lg dark:hover:shadow-lg/20',
                 onClick && !isLoading && 'cursor-pointer',
                 isLoading && 'pointer-events-none opacity-60',
                 className,
