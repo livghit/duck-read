@@ -85,9 +85,6 @@ export default function BooksSearch({
     const [hasOnlineOption, setHasOnlineOption] = useState(false);
     const [searchMessage, setSearchMessage] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [savingBookId, setSavingBookId] = useState<string | number | null>(
-        null,
-    );
     const [addedBookIds, setAddedBookIds] = useState<Set<string>>(new Set());
     const [rateLimited, setRateLimited] = useState(false);
     const [onlineDisabled, setOnlineDisabled] = useState(false);
@@ -177,34 +174,7 @@ export default function BooksSearch({
     };
 
     const handleBookClick = (book: Book) => {
-        // Check if this is an online book (has external_id but id is string)
-        const isOnlineBook = book.external_id && typeof book.id === 'string';
-
-        if (isOnlineBook) {
-            // Save the book first, then navigate
-            setSavingBookId(book.id);
-
-            router.post(
-                '/books/store-and-view',
-                {
-                    title: book.title,
-                    author: book.author,
-                    isbn: book.isbn,
-                    cover_url: book.cover_url,
-                    external_id: book.external_id,
-                    ol_work_key: book.ol_work_key,
-                    publisher: book.publisher,
-                    publish_date: book.publish_date,
-                },
-                {
-                    preserveScroll: true,
-                    onFinish: () => setSavingBookId(null),
-                },
-            );
-        } else {
-            // Local book, navigate directly
-            router.visit(`/books/${book.id}`);
-        }
+        router.visit(`/books/${book.id}`);
     };
 
     const handleAddToReviewList = (e: React.MouseEvent, book: Book) => {
@@ -342,24 +312,33 @@ export default function BooksSearch({
                         )}
 
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                            {searchResults.map((book, index) => (
-                                <BookCard
-                                    key={`${book.external_id || book.id}-${index}`}
-                                    book={book}
-                                    onClick={() => handleBookClick(book)}
-                                    isLoading={savingBookId === book.id}
-                                    actionButton={{
-                                        icon: <Heart className="h-4 w-4" />,
-                                        onClick: (e) =>
-                                            handleAddToReviewList(e, book),
-                                        label: 'Add to review list',
-                                        variant: 'ghost',
-                                        isActive: addedBookIds.has(
-                                            getBookKey(book),
-                                        ),
-                                    }}
-                                />
-                            ))}
+                            {searchResults.map((book, index) => {
+                                const isLocalBook =
+                                    typeof book.id === 'number' && book.id > 0;
+
+                                return (
+                                    <BookCard
+                                        key={`${book.external_id || book.id}-${index}`}
+                                        book={book}
+                                        onClick={
+                                            isLocalBook
+                                                ? () => handleBookClick(book)
+                                                : undefined
+                                        }
+                                        disableHover={!isLocalBook}
+                                        actionButton={{
+                                            icon: <Heart className="h-4 w-4" />,
+                                            onClick: (e) =>
+                                                handleAddToReviewList(e, book),
+                                            label: 'Add to review list',
+                                            variant: 'ghost',
+                                            isActive: addedBookIds.has(
+                                                getBookKey(book),
+                                            ),
+                                        }}
+                                    />
+                                );
+                            })}
                         </div>
                     </>
                 ) : searchQuery ? (
