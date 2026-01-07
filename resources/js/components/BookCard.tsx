@@ -1,6 +1,8 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Cute3dSpinner } from '@/components/ui/cute-3d-spinner';
 import { cn } from '@/lib/utils';
+import { useState } from 'react';
 
 interface BookCardProps {
     book: {
@@ -32,6 +34,8 @@ export default function BookCard({
     actionButton,
     isLoading = false,
 }: BookCardProps) {
+    const [isImageLoaded, setIsImageLoaded] = useState(false);
+
     return (
         <Card
             className={cn(
@@ -59,6 +63,13 @@ export default function BookCard({
                                 </div>
                             </div>
                         )}
+
+                        {!isLoading && !isImageLoaded && (
+                            <div className="absolute inset-0 z-10 flex items-center justify-center bg-muted">
+                                <Cute3dSpinner size="sm" />
+                            </div>
+                        )}
+
                         <img
                             src={(function () {
                                 const placeholder =
@@ -70,9 +81,16 @@ export default function BookCard({
                                 return url;
                             })()}
                             alt={book.title}
-                            className="h-full w-full object-cover"
+                            className={cn(
+                                'h-full w-full object-cover transition-opacity duration-300',
+                                !isImageLoaded && !isLoading
+                                    ? 'opacity-0'
+                                    : 'opacity-100',
+                            )}
+                            onLoad={() => setIsImageLoaded(true)}
                             onError={(e) => {
                                 const img = e.currentTarget as HTMLImageElement;
+                                setIsImageLoaded(true); // Stop loading on error too
                                 if ((img as any).dataset.fallbackApplied)
                                     return;
                                 (img as any).dataset.fallbackApplied = 'true';
