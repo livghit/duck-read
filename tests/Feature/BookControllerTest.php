@@ -362,4 +362,113 @@ describe('BookController', function () {
             $response->assertSessionHasErrors(['title', 'author']);
         });
     });
+
+    describe('edit', function () {
+        it('renders edit page with book data', function () {
+            $user = User::factory()->create();
+            $book = Book::factory()->create();
+
+            $response = $this->actingAs($user)->get(route('books.edit', $book));
+
+            $response->assertOk()
+                ->assertInertia(fn (Assert $page) => $page
+                    ->component('books/edit')
+                    ->has('book')
+                    ->where('book.id', $book->id)
+                );
+        });
+
+        it('redirects to login when unauthenticated', function () {
+            $book = Book::factory()->create();
+
+            $response = $this->get(route('books.edit', $book));
+
+            $response->assertRedirect(route('login'));
+        });
+    });
+
+    describe('update', function () {
+        it('updates a book with new data', function () {
+            $user = User::factory()->create();
+            $book = Book::factory()->create([
+                'description' => 'Old description',
+                'publisher' => 'Old Publisher',
+            ]);
+
+            $updateData = [
+                'title' => 'Updated Title',
+                'author' => 'Updated Author',
+                'description' => 'New description',
+                'publisher' => 'New Publisher',
+                'published_year' => 2024,
+            ];
+
+            $response = $this->actingAs($user)->patch(route('books.update', $book), $updateData);
+
+            $response->assertRedirect(route('books.show', $book))
+                ->assertSessionHas('success', 'Book updated successfully!');
+
+            $this->assertDatabaseHas('books', [
+                'id' => $book->id,
+                'title' => 'Updated Title',
+                'author' => 'Updated Author',
+                'description' => 'New description',
+                'publisher' => 'New Publisher',
+                'published_year' => 2024,
+            ]);
+        });
+
+        it('updates book with partial data', function () {
+            $user = User::factory()->create();
+            $book = Book::factory()->create();
+
+            $updateData = [
+                'description' => 'Added description',
+            ];
+
+            $this->actingAs($user)->patch(route('books.update', $book), $updateData);
+
+            $book->refresh();
+
+            expect($book->description)->toBe('Added description');
+        });
+
+        it('requires authentication', function () {
+            $book = Book::factory()->create();
+            $updateData = ['title' => 'New Title'];
+
+            $response = $this->patch(route('books.update', $book), $updateData);
+
+            $response->assertRedirect(route('login'));
+        });
+
+        it('validates required fields when provided', function () {
+            $user = User::factory()->create();
+            $book = Book::factory()->create();
+
+            $updateData = [
+                'title' => '',
+                'author' => '',
+            ];
+
+            $response = $this->actingAs($user)->patch(route('books.update', $book), $updateData);
+
+            $response->assertSessionHasErrors(['title', 'author']);
+        });
+
+        it('validates published_year is a valid year', function () {
+            $user = User::factory()->create();
+            $book = Book::factory()->create();
+
+            $updateData = [
+                'title' => 'Valid Title',
+                'author' => 'Valid Author',
+                'published_year' => 999, // Too early
+            ];
+
+            $response = $this->actingAs($user)->patch(route('books.update', $book), $updateData);
+
+            $response->assertSessionHasErrors('published_year');
+        });
+    });
 });

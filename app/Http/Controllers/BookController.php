@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\SearchBooksRequest;
 use App\Http\Requests\StoreBookRequest;
 use App\Http\Requests\StoreManualBookRequest;
+use App\Http\Requests\UpdateBookRequest;
 use App\Models\Book;
 use App\Services\BookSearchService;
 use Illuminate\Http\JsonResponse;
@@ -15,6 +16,22 @@ use Inertia\Response;
 class BookController extends Controller
 {
     public function __construct(private BookSearchService $searchService) {}
+
+    public function edit(Book $book): Response
+    {
+        return Inertia::render('books/edit', [
+            'book' => $book,
+        ]);
+    }
+
+    public function update(UpdateBookRequest $request, Book $book): RedirectResponse
+    {
+        $validated = $request->validated();
+
+        $book->update($validated);
+
+        return redirect()->route('books.show', $book)->with('success', 'Book updated successfully!');
+    }
 
     public function search(SearchBooksRequest $request): Response
     {

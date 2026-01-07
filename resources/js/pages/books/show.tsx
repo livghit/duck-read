@@ -1,8 +1,10 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Cute3dSpinner } from '@/components/ui/cute-3d-spinner';
 import { Separator } from '@/components/ui/separator';
 import AppLayout from '@/layouts/app-layout';
+import { cn } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import {
@@ -54,6 +56,7 @@ export default function BooksShow({
 }: BooksShowProps) {
     const [isAddingToList, setIsAddingToList] = useState(false);
     const [isRemovingFromList, setIsRemovingFromList] = useState(false);
+    const [isCoverLoaded, setIsCoverLoaded] = useState(false);
 
     const breadcrumbs: BreadcrumbItem[] = [
         {
@@ -113,7 +116,12 @@ export default function BooksShow({
                     {/* Book Cover */}
                     <div className="md:col-span-1">
                         <div className="sticky top-4">
-                            <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg shadow-lg">
+                            <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg bg-muted shadow-lg">
+                                {!isCoverLoaded && (
+                                    <div className="absolute inset-0 z-10 flex items-center justify-center">
+                                        <Cute3dSpinner size="md" />
+                                    </div>
+                                )}
                                 <img
                                     src={(function () {
                                         const placeholder =
@@ -125,8 +133,15 @@ export default function BooksShow({
                                         return url;
                                     })()}
                                     alt={book.title}
-                                    className="h-full w-full object-cover"
+                                    className={cn(
+                                        'h-full w-full object-cover transition-opacity duration-300',
+                                        !isCoverLoaded
+                                            ? 'opacity-0'
+                                            : 'opacity-100',
+                                    )}
+                                    onLoad={() => setIsCoverLoaded(true)}
                                     onError={(e) => {
+                                        setIsCoverLoaded(true);
                                         const img =
                                             e.currentTarget as HTMLImageElement;
                                         if (
@@ -241,21 +256,33 @@ export default function BooksShow({
                                         : 'Add to Review List'}
                                 </Button>
                             )}
+                            <Button
+                                variant="outline"
+                                onClick={() =>
+                                    router.visit(`/books/${book.id}/edit`)
+                                }
+                            >
+                                Edit Book Info
+                            </Button>
                         </div>
 
                         <Separator />
 
                         {/* Description */}
-                        {book.description && (
-                            <div>
-                                <h2 className="mb-3 text-2xl font-semibold">
-                                    About this book
-                                </h2>
+                        <div>
+                            <h2 className="mb-3 text-2xl font-semibold">
+                                About this book
+                            </h2>
+                            {book.description ? (
                                 <p className="text-base leading-relaxed whitespace-pre-line text-foreground/90">
                                     {book.description}
                                 </p>
-                            </div>
-                        )}
+                            ) : (
+                                <p className="text-base text-muted-foreground italic">
+                                    No description available for this book.
+                                </p>
+                            )}
+                        </div>
 
                         {/* Excerpt */}
                         {book.excerpt && (

@@ -19,10 +19,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Books routes
     Route::get('books/search', [\App\Http\Controllers\BookController::class, 'search'])->name('books.search');
-    Route::get('books/{book}', [\App\Http\Controllers\BookController::class, 'show'])->name('books.show');
+    Route::post('books/store-and-view', [\App\Http\Controllers\BookController::class, 'storeAndView'])->name('books.store-and-view');
     Route::post('books', [\App\Http\Controllers\BookController::class, 'store'])->name('books.store');
     Route::post('books/manual', [\App\Http\Controllers\BookController::class, 'storeManual'])->name('books.store-manual');
-    Route::post('books/store-and-view', [\App\Http\Controllers\BookController::class, 'storeAndView'])->name('books.store-and-view');
+    Route::get('books/{book}/edit', [\App\Http\Controllers\BookController::class, 'edit'])->name('books.edit');
+    Route::patch('books/{book}', [\App\Http\Controllers\BookController::class, 'update'])->name('books.update');
+    Route::get('books/{book}', [\App\Http\Controllers\BookController::class, 'show'])->name('books.show');
 
     // Reviews routes
     Route::get('reviews', [\App\Http\Controllers\ReviewController::class, 'index'])->name('reviews.index');
