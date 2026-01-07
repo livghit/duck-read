@@ -19,7 +19,7 @@ return new class extends Migration
             $table->longText('content');
             $table->timestamps();
 
-            $table->unique(['user_id', 'book_id']);
+            $table->index(['user_id', 'book_id']);
             $table->index('rating');
         });
     }
